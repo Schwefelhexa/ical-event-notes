@@ -1,4 +1,5 @@
 import { App, Editor, MarkdownView, Modal, Notice, Platform, Plugin, PluginSettingTab, requestUrl, Setting } from 'obsidian';
+import { convertIcsCalendar, IcsCalendar } from 'ts-ics';
 
 interface CalToEventPluginSettings {
 	sourceUrl: string | null;
@@ -41,9 +42,20 @@ export default class IcalToEventsPlugin extends Plugin {
 		// TODO: Fetch/refresh calendar data
 		// Needs debouncing, since mobile triggers focus pretty often
 
-		if (!this.settings.sourceUrl) return;
+		if (!this.settings.sourceUrl) {
+			new SampleModal(this.app, 'No source URL configured.').open();
+			return;
+		}
 
 		const res = await requestUrl({ url: this.settings.sourceUrl, method: "GET", headers: {} });
+		if (res.status !== 200 || !res.text) {
+			// TODO: Error handling
+			return;
+		}
+
+		const calendar: IcsCalendar = convertIcsCalendar(undefined, res.text);
+
+		new SampleModal(this.app, `Fetched ${calendar.events?.length ?? 0} events.`).open();
 	}
 
 	onunload() {
