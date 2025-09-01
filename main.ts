@@ -1,4 +1,4 @@
-import { App, Editor, MarkdownView, Modal, Notice, Platform, Plugin, PluginSettingTab, requestUrl, Setting, SuggestModal } from 'obsidian';
+import { App, Editor, MarkdownView, Modal, Notice, Platform, Plugin, PluginSettingTab, requestUrl, Setting, SuggestModal, TFile } from 'obsidian';
 import { convertIcsCalendar, extendByRecurrenceRule, IcsCalendar, IcsEvent, IcsEvent } from 'ts-ics';
 
 interface CalToEventPluginSettings {
@@ -152,10 +152,17 @@ export class CalendarEventsModal extends SuggestModal<IcsEvent> {
 		// TODO: Based on event date and time, as well as summary
 		const fileName = `${sanitizedSummary}.md`;
 
+		// Open file if it already exists
+		const existingFile = this.app.vault.getAbstractFileByPath(fileName);
+		if (existingFile && existingFile instanceof TFile) {
+			this.app.workspace.getLeaf().openFile(existingFile);
+			return;
+		}
+
 		this.app.vault.create(fileName, `Desc:\n${event.description}\n\nLocation:\n${event.location}`)
 			.then((file) => {
 				this.app.workspace.getLeaf().openFile(file);
-			});
+			})
 	}
 }
 
