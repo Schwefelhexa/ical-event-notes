@@ -36,7 +36,7 @@ export default class IcalToEventsPlugin extends Plugin {
 			name: 'Create/Open Note from Event',
 			callback: () => {
 				// TODO: Only show in-progress, recently ended, and upcoming events
-				new CalendarEventsModal(this.app, this.settings.cache.events).open();
+				new CalendarEventsModal(this.app, this.settings.cache.events,).open();
 			}
 		})
 
@@ -142,12 +142,20 @@ export class CalendarEventsModal extends SuggestModal<IcsEvent> {
 	// Renders each suggestion item.
 	renderSuggestion(event: IcsEvent, el: HTMLElement) {
 		el.createEl('div', { text: event.summary });
-		el.createEl('small', { text: event.start?.date.toLocaleString() ?? '' }); // TODO: Format better
+		el.createEl('small', { text: event.start?.date?.toLocaleString() ?? '' }); // TODO: Format better
 	}
 
 	// Perform action on the selected suggestion.
 	onChooseSuggestion(event: IcsEvent, evt: MouseEvent | KeyboardEvent) {
-		new SampleModal(this.app, `You selected: ${event.summary}`).open();
+		const sanitizedSummary = event.summary?.replace(/[\/\\?%*:|"<>]/g, '-') ?? 'Event';
+
+		// TODO: Based on event date and time, as well as summary
+		const fileName = `${sanitizedSummary}.md`;
+
+		this.app.vault.create(fileName, `Desc:\n${event.description}\n\nLocation:\n${event.location}`)
+			.then((file) => {
+				this.app.workspace.getLeaf().openFile(file);
+			});
 	}
 }
 
