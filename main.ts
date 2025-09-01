@@ -1,9 +1,12 @@
 import { App, Editor, MarkdownView, Modal, Notice, Platform, Plugin, PluginSettingTab, requestUrl, Setting } from 'obsidian';
-import { convertIcsCalendar, IcsCalendar } from 'ts-ics';
+import { convertIcsCalendar, extendByRecurrenceRule, IcsCalendar } from 'ts-ics';
 
 interface CalToEventPluginSettings {
 	sourceUrl: string | null;
 	refreshIntervalMinutes: number;
+	cache: {
+		events: IcsCalendar['events'];
+	}
 }
 
 const DEFAULT_SETTINGS: CalToEventPluginSettings = {
@@ -54,6 +57,30 @@ export default class IcalToEventsPlugin extends Plugin {
 		}
 
 		const calendar: IcsCalendar = convertIcsCalendar(undefined, res.text);
+
+		const events = calendar.events ?? [];
+		const expandedEvents = events.flatMap(event => {
+			if (!event.recurrenceRule) return [event];
+
+			// TODO: Tweak this
+			const start = new Date(Date.now() - 1000 * 60 * 60 * 24 * 30); // 30 days ago
+			const end = new Date(Date.now() + 1000 * 60 * 60 * 24 * 365); // 1 year in future
+
+			// Map each occurrence to an event instance
+			const recurrences = extendByRecurrenceRule(event.recurrenceRule, { start, end })
+			const occurrences = recurrences.map(date => {
+				return {
+					...event,
+					id: `${event.recurrenceId ?? event.uid}-${date.toISOString()}`, // Unique ID per occurrence
+					start: date,
+					end: new Date(date.getTime() + (event.end!.date.getTime() - event.start!.date.getTime())), // Maintain duration
+					recurrenceRule: undefined // Clear recurrence rule for occurrences
+				};
+			});
+
+			console.log(`Expanded event ${event.summary} into ${occurrences.length} occurrences.`);
+			return occurrences;
+		})
 
 		new SampleModal(this.app, `Fetched ${calendar.events?.length ?? 0} events.`).open();
 	}
