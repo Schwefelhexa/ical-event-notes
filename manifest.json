@@ -1,11 +1,10 @@
 {
-	"id": "sample-plugin",
-	"name": "Sample Plugin",
-	"version": "1.0.0",
+	"id": "ical-event-notes",
+	"name": "iCal Event Notes",
+	"version": "0.1.0",
 	"minAppVersion": "0.15.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"description": "Create Obsidian Notes from any iCal Event",
+	"author": "Alexander Baron",
+	"authorUrl": "https://alexbaron.me",
 	"isDesktopOnly": false
 }

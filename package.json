@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
-	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"name": "ical-event-notes",
+	"version": "0.1.0",
+	"description": "Create Obsidian Notes from any iCal Event",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
