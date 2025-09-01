@@ -1,17 +1,20 @@
-import { App, Editor, MarkdownView, Modal, Notice, Platform, Plugin, PluginSettingTab, requestUrl, Setting } from 'obsidian';
-import { convertIcsCalendar, extendByRecurrenceRule, IcsCalendar } from 'ts-ics';
+import { App, Editor, MarkdownView, Modal, Notice, Platform, Plugin, PluginSettingTab, requestUrl, Setting, SuggestModal } from 'obsidian';
+import { convertIcsCalendar, extendByRecurrenceRule, IcsCalendar, IcsEvent, IcsEvent } from 'ts-ics';
 
 interface CalToEventPluginSettings {
 	sourceUrl: string | null;
 	refreshIntervalMinutes: number;
 	cache: {
-		events: IcsCalendar['events'];
+		events: IcsEvent[];
 	}
 }
 
 const DEFAULT_SETTINGS: CalToEventPluginSettings = {
 	sourceUrl: null,
-	refreshIntervalMinutes: 15
+	refreshIntervalMinutes: 15,
+	cache: {
+		events: []
+	}
 }
 
 export default class IcalToEventsPlugin extends Plugin {
@@ -20,7 +23,6 @@ export default class IcalToEventsPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
-		// This adds a simple command that can be triggered anywhere
 		this.addCommand({
 			id: 'reload-calendar',
 			name: 'Reload Calendar',
@@ -28,6 +30,15 @@ export default class IcalToEventsPlugin extends Plugin {
 				this.refresh();
 			}
 		});
+
+		this.addCommand({
+			id: 'create-note-from-event',
+			name: 'Create/Open Note from Event',
+			callback: () => {
+				// TODO: Only show in-progress, recently ended, and upcoming events
+				new CalendarEventsModal(this.app, this.settings.cache.events).open();
+			}
+		})
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new IcalToEventsSettingTab(this.app, this));
@@ -59,7 +70,7 @@ export default class IcalToEventsPlugin extends Plugin {
 		const calendar: IcsCalendar = convertIcsCalendar(undefined, res.text);
 
 		const events = calendar.events ?? [];
-		const expandedEvents = events.flatMap(event => {
+		const expandedEvents: IcsEvent[] = events.flatMap(event => {
 			if (!event.recurrenceRule) return [event];
 
 			// TODO: Tweak this
@@ -82,7 +93,8 @@ export default class IcalToEventsPlugin extends Plugin {
 			return occurrences;
 		})
 
-		new SampleModal(this.app, `Fetched ${calendar.events?.length ?? 0} events.`).open();
+		this.settings.cache.events = expandedEvents;
+		await this.saveSettings();
 	}
 
 	onunload() {
@@ -111,6 +123,31 @@ class SampleModal extends Modal {
 	onClose() {
 		const { contentEl } = this;
 		contentEl.empty();
+	}
+}
+
+export class CalendarEventsModal extends SuggestModal<IcsEvent> {
+	constructor(app: App, private events: IcsEvent[]) {
+		super(app);
+	}
+
+	// Returns all available suggestions.
+	getSuggestions(query: string): IcsEvent[] {
+		return this.events.filter((event) =>
+			// TODO: Fuzzy search; don't search only on summary
+			event.summary?.toLowerCase().includes(query.toLowerCase())
+		);
+	}
+
+	// Renders each suggestion item.
+	renderSuggestion(event: IcsEvent, el: HTMLElement) {
+		el.createEl('div', { text: event.summary });
+		el.createEl('small', { text: event.start?.date.toLocaleString() ?? '' }); // TODO: Format better
+	}
+
+	// Perform action on the selected suggestion.
+	onChooseSuggestion(event: IcsEvent, evt: MouseEvent | KeyboardEvent) {
+		new SampleModal(this.app, `You selected: ${event.summary}`).open();
 	}
 }
 
