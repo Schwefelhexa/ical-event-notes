@@ -1,17 +1,42 @@
+import * as exp from 'constants';
 import { App, Editor, MarkdownView, Modal, Notice, Platform, Plugin, PluginSettingTab, requestUrl, Setting, SuggestModal, TFile } from 'obsidian';
 import { convertIcsCalendar, extendByRecurrenceRule, IcsCalendar, IcsEvent, IcsEvent } from 'ts-ics';
 
 interface CalToEventPluginSettings {
 	sourceUrl: string | null;
 	refreshIntervalMinutes: number;
+	eventNoteTemplate: string;
 	cache: {
 		events: IcsEvent[];
 	}
 }
 
+const EVENT_NOTE_TEMPLATE = `---
+tags: event
+title: "{{date}} - {{summary}}"
+date: {{date}}
+summary: {{summary}}
+location: {{location}}
+---
+
+**When:** {{start}} - {{end}}
+**Where:** {{location}}
+**Participants:** {{attendees}}
+
+---
+
+_Your notes here_
+
+---
+
+**Event Details:**
+{{description}}
+`;
+
 const DEFAULT_SETTINGS: CalToEventPluginSettings = {
 	sourceUrl: null,
 	refreshIntervalMinutes: 15,
+	eventNoteTemplate: EVENT_NOTE_TEMPLATE,
 	cache: {
 		events: []
 	}
@@ -36,7 +61,7 @@ export default class IcalToEventsPlugin extends Plugin {
 			name: 'Create/Open Note from Event',
 			callback: () => {
 				// TODO: Only show in-progress, recently ended, and upcoming events
-				new CalendarEventsModal(this.app, this.settings.cache.events,).open();
+				new CalendarEventsModal(this.app, this.settings.cache.events, this).open();
 			}
 		})
 
@@ -93,6 +118,22 @@ export default class IcalToEventsPlugin extends Plugin {
 			return occurrences;
 		})
 
+		function normalizeDate(date: Date | string | undefined): Date | undefined {
+			if (date instanceof Date) return date;
+			if (typeof date === 'string') {
+				const parsed = new Date(date);
+				if (!isNaN(parsed.getTime())) return parsed;
+			}
+			return undefined;
+		}
+
+		// Normalize dates
+		const normalizedEvents = expandedEvents.map(event => ({
+			...event,
+			start: { ...event.start, date: normalizeDate(event.start?.date) },
+			end: { ...event.end, date: normalizeDate(event.end?.date) },
+		}) as IcsEvent);
+
 		this.settings.cache.events = expandedEvents;
 		await this.saveSettings();
 	}
@@ -126,8 +167,36 @@ class SampleModal extends Modal {
 	}
 }
 
+function formatEvent(template: string, event: IcsEvent): string {
+	const replacements: { [key: string]: string } = {
+		'{{summary}}': event.summary ?? '',
+		'{{location}}': event.location ?? '',
+		'{{description}}': event.description ?? '',
+		'{{attendees}}': (event.attendees ?? []).map(a => a.name ?? a.email ?? '').join(', '),
+	};
+
+	if (event.start?.date instanceof Date) {
+		replacements['{{date}}'] = event.start.date.toLocaleDateString();
+		replacements['{{start}}'] = event.start.date.toLocaleString();
+	} else {
+		replacements['{{date}}'] = JSON.stringify(event.start?.date) ?? '_undefined_';
+		replacements['{{start}}'] = JSON.stringify(event.start?.date) ?? '_undefined_';
+	}
+	if (event.end?.date instanceof Date) {
+		replacements['{{end}}'] = event.end.date.toLocaleString();
+	} else {
+		replacements['{{end}}'] = JSON.stringify(event.end?.date) ?? '_undefined_';
+	}
+
+	let result = template;
+	for (const [key, value] of Object.entries(replacements)) {
+		result = result.replace(new RegExp(key, 'g'), value);
+	}
+	return result;
+}
+
 export class CalendarEventsModal extends SuggestModal<IcsEvent> {
-	constructor(app: App, private events: IcsEvent[]) {
+	constructor(app: App, private events: IcsEvent[], private plugin: IcalToEventsPlugin) {
 		super(app);
 	}
 
@@ -159,7 +228,7 @@ export class CalendarEventsModal extends SuggestModal<IcsEvent> {
 			return;
 		}
 
-		this.app.vault.create(fileName, `Desc:\n${event.description}\n\nLocation:\n${event.location}`)
+		this.app.vault.create(fileName, formatEvent(this.plugin.settings.eventNoteTemplate, event))
 			.then((file) => {
 				this.app.workspace.getLeaf().openFile(file);
 			})
@@ -187,6 +256,30 @@ class IcalToEventsSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.sourceUrl ?? '')
 				.onChange(async (value) => {
 					this.plugin.settings.sourceUrl = value;
+					await this.plugin.saveSettings();
+				}));
+		new Setting(containerEl)
+			.setName('Refresh Interval (minutes)')
+			.setDesc('How often to refresh the calendar data')
+			.addText(text => text
+				.setPlaceholder('15')
+				.setValue(this.plugin.settings.refreshIntervalMinutes.toString())
+				.onChange(async (value) => {
+					const intValue = parseInt(value);
+					if (!isNaN(intValue) && intValue > 0) {
+						this.plugin.settings.refreshIntervalMinutes = intValue;
+						await this.plugin.saveSettings();
+					}
+				}));
+
+		new Setting(containerEl)
+			.setName('Event Note Template')
+			.setDesc('Template for event notes. Use {{placeholders}} for event properties.')
+			.addTextArea(text => text
+				.setPlaceholder(EVENT_NOTE_TEMPLATE)
+				.setValue(this.plugin.settings.eventNoteTemplate)
+				.onChange(async (value) => {
+					this.plugin.settings.eventNoteTemplate = value;
 					await this.plugin.saveSettings();
 				}));
 	}
