@@ -18,7 +18,6 @@ date: {{date}}
 summary: {{summary}}
 location: {{location}}
 ---
-
 **When:** {{start}} - {{end}}
 **Where:** {{location}}
 **Participants:** {{attendees}}
@@ -218,8 +217,11 @@ export class CalendarEventsModal extends SuggestModal<IcsEvent> {
 	onChooseSuggestion(event: IcsEvent, evt: MouseEvent | KeyboardEvent) {
 		const sanitizedSummary = event.summary?.replace(/[\/\\?%*:|"<>]/g, '-') ?? 'Event';
 
-		// TODO: Based on event date and time, as well as summary
-		const fileName = `${sanitizedSummary}.md`;
+		const datePart = event.start?.date instanceof Date
+			? event.start.date.toISOString().split('T')[0] + " | "
+			: '';
+
+		const fileName = `${datePart}${sanitizedSummary}.md`;
 
 		// Open file if it already exists
 		const existingFile = this.app.vault.getAbstractFileByPath(fileName);
