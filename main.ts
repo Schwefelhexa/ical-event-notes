@@ -1,15 +1,24 @@
 import * as exp from 'constants';
 import { App, Editor, MarkdownView, Modal, Notice, Platform, Plugin, PluginSettingTab, requestUrl, Setting, SuggestModal, TFile } from 'obsidian';
-import { convertIcsCalendar, extendByRecurrenceRule, IcsCalendar, IcsEvent, IcsEvent } from 'ts-ics';
+import { convertIcsCalendar, extendByRecurrenceRule, IcsCalendar, IcsEvent } from 'ts-ics';
 
 interface CalToEventPluginSettings {
-	sourceUrl: string | null;
+	calendarSources: CalendarSource[];
 	refreshIntervalMinutes: number;
 	eventNoteTemplate: string;
 	cache: {
-		events: IcsEvent[];
+		events: CachedEvent[];
 	}
 }
+
+type CalendarSource = {
+	name: string;
+	url: string;
+}
+
+type CachedEvent = {
+	calendarSource: CalendarSource;
+} & IcsEvent;
 
 const EVENT_NOTE_TEMPLATE = `---
 tags: event
@@ -33,7 +42,7 @@ _Your notes here_
 `;
 
 const DEFAULT_SETTINGS: CalToEventPluginSettings = {
-	sourceUrl: null,
+	calendarSources: [],
 	refreshIntervalMinutes: 15,
 	eventNoteTemplate: EVENT_NOTE_TEMPLATE,
 	cache: {
@@ -80,60 +89,67 @@ export default class IcalToEventsPlugin extends Plugin {
 		// TODO: Fetch/refresh calendar data
 		// Needs debouncing, since mobile triggers focus pretty often
 
-		if (!this.settings.sourceUrl) {
+		if ((this.settings.calendarSources?.length ?? 0) === 0) {
 			new SampleModal(this.app, 'No source URL configured.').open();
 			return;
 		}
 
-		const res = await requestUrl({ url: this.settings.sourceUrl, method: "GET", headers: {} });
-		if (res.status !== 200 || !res.text) {
-			// TODO: Error handling
-			return;
-		}
+		const result: CachedEvent[] = []
 
-		const calendar: IcsCalendar = convertIcsCalendar(undefined, res.text);
-
-		const events = calendar.events ?? [];
-		const expandedEvents: IcsEvent[] = events.flatMap(event => {
-			if (!event.recurrenceRule) return [event];
-
-			// TODO: Tweak this
-			const start = new Date(Date.now() - 1000 * 60 * 60 * 24 * 30); // 30 days ago
-			const end = new Date(Date.now() + 1000 * 60 * 60 * 24 * 365); // 1 year in future
-
-			// Map each occurrence to an event instance
-			const recurrences = extendByRecurrenceRule(event.recurrenceRule, { start, end })
-			const occurrences = recurrences.map(date => {
-				return {
-					...event,
-					id: `${event.recurrenceId ?? event.uid}-${date.toISOString()}`, // Unique ID per occurrence
-					start: date,
-					end: new Date(date.getTime() + (event.end!.date.getTime() - event.start!.date.getTime())), // Maintain duration
-					recurrenceRule: undefined // Clear recurrence rule for occurrences
-				};
-			});
-
-			console.log(`Expanded event ${event.summary} into ${occurrences.length} occurrences.`);
-			return occurrences;
-		})
-
-		function normalizeDate(date: Date | string | undefined): Date | undefined {
-			if (date instanceof Date) return date;
-			if (typeof date === 'string') {
-				const parsed = new Date(date);
-				if (!isNaN(parsed.getTime())) return parsed;
+		for (const source of this.settings.calendarSources) {
+			const res = await requestUrl({ url: source.url, method: "GET", headers: {} });
+			if (res.status !== 200 || !res.text) {
+				// TODO: Error handling
+				return;
 			}
-			return undefined;
+
+			const calendar: IcsCalendar = convertIcsCalendar(undefined, res.text);
+
+			const events = calendar.events ?? [];
+			const expandedEvents: IcsEvent[] = events.flatMap(event => {
+				if (!event.recurrenceRule) return [event];
+
+				// TODO: Tweak this
+				const start = new Date(Date.now() - 1000 * 60 * 60 * 24 * 30); // 30 days ago
+				const end = new Date(Date.now() + 1000 * 60 * 60 * 24 * 365); // 1 year in future
+
+				// Map each occurrence to an event instance
+				const recurrences = extendByRecurrenceRule(event.recurrenceRule, { start, end })
+				const occurrences = recurrences.map(date => {
+					return {
+						...event,
+						id: `${event.recurrenceId ?? event.uid}-${date.toISOString()}`, // Unique ID per occurrence
+						start: date,
+						end: new Date(date.getTime() + (event.end!.date.getTime() - event.start!.date.getTime())), // Maintain duration
+						recurrenceRule: undefined // Clear recurrence rule for occurrences
+					};
+				});
+
+				console.log(`Expanded event ${event.summary} into ${occurrences.length} occurrences.`);
+				return occurrences;
+			})
+
+			function normalizeDate(date: Date | string | undefined): Date | undefined {
+				if (date instanceof Date) return date;
+				if (typeof date === 'string') {
+					const parsed = new Date(date);
+					if (!isNaN(parsed.getTime())) return parsed;
+				}
+				return undefined;
+			}
+
+			// Normalize dates
+			const normalizedEvents = expandedEvents.map(event => ({
+				...event,
+				start: { ...event.start, date: normalizeDate(event.start?.date) },
+				end: { ...event.end, date: normalizeDate(event.end?.date) },
+				calendarSource: source
+			}) as CachedEvent);
+
+			result.push(...normalizedEvents);
 		}
 
-		// Normalize dates
-		const normalizedEvents = expandedEvents.map(event => ({
-			...event,
-			start: { ...event.start, date: normalizeDate(event.start?.date) },
-			end: { ...event.end, date: normalizeDate(event.end?.date) },
-		}) as IcsEvent);
-
-		this.settings.cache.events = expandedEvents;
+		this.settings.cache.events = result;
 		await this.saveSettings();
 	}
 
@@ -194,13 +210,13 @@ function formatEvent(template: string, event: IcsEvent): string {
 	return result;
 }
 
-export class CalendarEventsModal extends SuggestModal<IcsEvent> {
-	constructor(app: App, private events: IcsEvent[], private plugin: IcalToEventsPlugin) {
+export class CalendarEventsModal extends SuggestModal<CachedEvent> {
+	constructor(app: App, private events: CachedEvent[], private plugin: IcalToEventsPlugin) {
 		super(app);
 	}
 
 	// Returns all available suggestions.
-	getSuggestions(query: string): IcsEvent[] {
+	getSuggestions(query: string): CachedEvent[] {
 		return this.events.filter((event) =>
 			// TODO: Fuzzy search; don't search only on summary
 			event.summary?.toLowerCase().includes(query.toLowerCase())
@@ -208,13 +224,13 @@ export class CalendarEventsModal extends SuggestModal<IcsEvent> {
 	}
 
 	// Renders each suggestion item.
-	renderSuggestion(event: IcsEvent, el: HTMLElement) {
+	renderSuggestion(event: CachedEvent, el: HTMLElement) {
 		el.createEl('div', { text: event.summary });
-		el.createEl('small', { text: event.start?.date?.toLocaleString() ?? '' }); // TODO: Format better
+		el.createEl('small', { text: event.calendarSource.name + " | " + (event.start?.date?.toLocaleString() ?? '') }); // TODO: Format better
 	}
 
 	// Perform action on the selected suggestion.
-	onChooseSuggestion(event: IcsEvent, evt: MouseEvent | KeyboardEvent) {
+	onChooseSuggestion(event: CachedEvent, evt: MouseEvent | KeyboardEvent) {
 		const sanitizedSummary = event.summary?.replace(/[\/\\?%*:|"<>]/g, '-') ?? 'Event';
 
 		const datePart = event.start?.date instanceof Date
@@ -251,15 +267,24 @@ class IcalToEventsSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('Source URL')
-			.setDesc('iCal URL to fetch')
-			.addText(text => text
-				.setPlaceholder('https://example.com/calendar.ics')
-				.setValue(this.plugin.settings.sourceUrl ?? '')
+			.setName('Calendar Sources')
+			.setDesc('List of calendar sources to fetch events from')
+			.addTextArea(text => text
+				.setPlaceholder('Work Calendar,https://example.com/work.ics\nPersonal Calendar,https://example.com/personal.ics')
+				.setValue(this.plugin.settings.calendarSources.map(src => `${src.name},${src.url}`).join('\n'))
 				.onChange(async (value) => {
-					this.plugin.settings.sourceUrl = value;
+					const lines = value.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+					const sources: CalendarSource[] = [];
+					for (const line of lines) {
+						const [name, url] = line.split(',').map(part => part.trim());
+						if (name && url) {
+							sources.push({ name, url });
+						}
+					}
+					this.plugin.settings.calendarSources = sources;
 					await this.plugin.saveSettings();
 				}));
+
 		new Setting(containerEl)
 			.setName('Refresh Interval (minutes)')
 			.setDesc('How often to refresh the calendar data')
