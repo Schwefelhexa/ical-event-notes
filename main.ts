@@ -1,6 +1,9 @@
 import * as exp from 'constants';
 import { App, Editor, MarkdownView, Modal, Notice, Platform, Plugin, PluginSettingTab, requestUrl, Setting, SuggestModal, TFile } from 'obsidian';
+import { release } from 'os';
 import { convertIcsCalendar, extendByRecurrenceRule, IcsCalendar, IcsEvent } from 'ts-ics';
+
+// TODO: Auto-link people notes - i.e. look up if name exists, or note with alias of name/email
 
 interface CalToEventPluginSettings {
 	calendarSources: CalendarSource[];
@@ -24,8 +27,8 @@ const EVENT_NOTE_TEMPLATE = `---
 tags: event
 title: "{{date}} - {{summary}}"
 date: {{date}}
-summary: {{summary}}
-location: {{location}}
+summary: "{{summary}}"
+location: "{{location}}"
 ---
 **When:** {{start}} - {{end}}
 **Where:** {{location}}
@@ -41,6 +44,9 @@ _Your notes here_
 {{description}}
 `;
 
+const searchLookahead = 24 * 60 * 60 * 1000; // 24 hours
+const searchLookbehind = 60 * 60 * 1000; // 1 hour
+
 const DEFAULT_SETTINGS: CalToEventPluginSettings = {
 	calendarSources: [],
 	refreshIntervalMinutes: 15,
@@ -48,6 +54,42 @@ const DEFAULT_SETTINGS: CalToEventPluginSettings = {
 	cache: {
 		events: []
 	}
+}
+
+function normalizeDate(date: Date | string | undefined): Date | undefined {
+	if (date instanceof Date) return date;
+	if (typeof date === 'string') {
+		const parsed = new Date(date);
+		if (!isNaN(parsed.getTime())) return parsed;
+	}
+	return undefined;
+}
+
+function expandRelevantEvents(events: CachedEvent[], now: Date): CachedEvent[] {
+	return events.flatMap(event => {
+		if (!event.recurrenceRule) return [event];
+
+		const start = new Date(now.getTime() - searchLookbehind);
+		const end = new Date(now.getTime() + searchLookahead);
+
+		// Map each occurrence to an event instance
+		const recurrences = extendByRecurrenceRule(event.recurrenceRule, { start, end })
+
+		const occurrences: CachedEvent[] = recurrences.map(date => {
+			const eventDuration = (event.end!.date.getTime() - event.start.date.getTime())
+			const end = new Date(date.getTime() + eventDuration)
+
+			return {
+				...event,
+				id: `${event.recurrenceId ?? event.uid}-${date.toISOString()}`, // Unique ID per occurrence
+				start: { ...event.start, date: date },
+				end: { ...event.end, date: new Date(date.getTime() + (event.end!.date.getTime() - event.start!.date.getTime())) }, // Maintain duration
+				recurrenceRule: undefined // Clear recurrence rule for occurrences
+			};
+		});
+
+		return occurrences;
+	})
 }
 
 export default class IcalToEventsPlugin extends Plugin {
@@ -68,8 +110,23 @@ export default class IcalToEventsPlugin extends Plugin {
 			id: 'create-note-from-event',
 			name: 'Create/Open Note from Event',
 			callback: () => {
-				// TODO: Only show in-progress, recently ended, and upcoming events
-				new CalendarEventsModal(this.app, this.settings.cache.events, this).open();
+				// TODO: Calculate relevance score based on time proximity
+				const now = new Date().getTime();
+				const cutoffLookbehind = new Date(now - searchLookbehind).getTime()
+				const cutoffLookahead = new Date(now + searchLookahead).getTime()
+
+				const relevantEvents = this.settings.cache.events.filter(event => {
+					const start = normalizeDate(event.start?.date)?.getTime();
+					const end = normalizeDate(event.end?.date)?.getTime();
+
+					if (!start || !end) return false
+
+					return start < now && end > now || // Current events
+						end < now && end >= cutoffLookbehind || // Recently ended
+						start > now && start <= cutoffLookahead // Upcoming
+				})
+
+				new CalendarEventsModal(this.app, relevantEvents, this).open();
 			}
 		})
 
@@ -104,42 +161,10 @@ export default class IcalToEventsPlugin extends Plugin {
 			}
 
 			const calendar: IcsCalendar = convertIcsCalendar(undefined, res.text);
-
 			const events = calendar.events ?? [];
-			const expandedEvents: IcsEvent[] = events.flatMap(event => {
-				if (!event.recurrenceRule) return [event];
-
-				// TODO: Tweak this
-				const start = new Date(Date.now() - 1000 * 60 * 60 * 24 * 30); // 30 days ago
-				const end = new Date(Date.now() + 1000 * 60 * 60 * 24 * 365); // 1 year in future
-
-				// Map each occurrence to an event instance
-				const recurrences = extendByRecurrenceRule(event.recurrenceRule, { start, end })
-				const occurrences = recurrences.map(date => {
-					return {
-						...event,
-						id: `${event.recurrenceId ?? event.uid}-${date.toISOString()}`, // Unique ID per occurrence
-						start: date,
-						end: new Date(date.getTime() + (event.end!.date.getTime() - event.start!.date.getTime())), // Maintain duration
-						recurrenceRule: undefined // Clear recurrence rule for occurrences
-					};
-				});
-
-				console.log(`Expanded event ${event.summary} into ${occurrences.length} occurrences.`);
-				return occurrences;
-			})
-
-			function normalizeDate(date: Date | string | undefined): Date | undefined {
-				if (date instanceof Date) return date;
-				if (typeof date === 'string') {
-					const parsed = new Date(date);
-					if (!isNaN(parsed.getTime())) return parsed;
-				}
-				return undefined;
-			}
 
 			// Normalize dates
-			const normalizedEvents = expandedEvents.map(event => ({
+			const normalizedEvents = events.map(event => ({
 				...event,
 				start: { ...event.start, date: normalizeDate(event.start?.date) },
 				end: { ...event.end, date: normalizeDate(event.end?.date) },
