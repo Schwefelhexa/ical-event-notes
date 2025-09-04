@@ -30,16 +30,14 @@ date: {{date}}
 summary: "{{summary}}"
 location: "{{location}}"
 ---
-**When:** {{start}} - {{end}}
-**Where:** {{location}}
-**Participants:** {{attendees}}
-
----
 
 _Your notes here_
 
 ---
 
+**When:** {{start}} - {{end}}
+**Where:** {{location}}
+**Participants:** {{attendees}}
 **Event Details:**
 {{description}}
 `;
@@ -92,6 +90,26 @@ function expandRelevantEvents(events: CachedEvent[], now: Date): CachedEvent[] {
 	})
 }
 
+function eventRelevance(event: CachedEvent, now: Date): number {
+	const nowMilis = now.getTime()
+	const cutoffLookbehind = new Date(nowMilis - searchLookbehind).getTime()
+	const cutoffLookahead = new Date(nowMilis + searchLookahead).getTime()
+
+	const start = normalizeDate(event.start?.date)?.getTime();
+	const end = normalizeDate(event.end?.date)?.getTime();
+	if (!start || !end) return -1;
+
+	// Current events
+	if (start < nowMilis && end > nowMilis) return Number.MAX_VALUE
+	// Recently ended
+	if (end < nowMilis && end >= cutoffLookbehind) return Math.floor((nowMilis - end) / 1000 / 60)
+	// Upcoming
+	if (start > nowMilis && start <= cutoffLookahead) return Math.floor((start - nowMilis) / 1000 / 60)
+
+	// Outside of relevance window
+	return -1
+}
+
 export default class IcalToEventsPlugin extends Plugin {
 	settings: CalToEventPluginSettings;
 
@@ -110,21 +128,11 @@ export default class IcalToEventsPlugin extends Plugin {
 			id: 'create-note-from-event',
 			name: 'Create/Open Note from Event',
 			callback: () => {
-				// TODO: Calculate relevance score based on time proximity
-				const now = new Date().getTime();
-				const cutoffLookbehind = new Date(now - searchLookbehind).getTime()
-				const cutoffLookahead = new Date(now + searchLookahead).getTime()
-
-				const relevantEvents = this.settings.cache.events.filter(event => {
-					const start = normalizeDate(event.start?.date)?.getTime();
-					const end = normalizeDate(event.end?.date)?.getTime();
-
-					if (!start || !end) return false
-
-					return start < now && end > now || // Current events
-						end < now && end >= cutoffLookbehind || // Recently ended
-						start > now && start <= cutoffLookahead // Upcoming
-				})
+				const now = new Date()
+				const relevantEvents = this.settings.cache.events.map(evnt => [evnt, eventRelevance(evnt, now)] as const)
+					.filter(([_, relevance]) => relevance > 0)
+					.sort(([_, relevanceA], [__, relevanceB]) => relevanceA - relevanceB)
+					.map(([evnt, _]) => evnt)
 
 				new CalendarEventsModal(this.app, relevantEvents, this).open();
 			}
