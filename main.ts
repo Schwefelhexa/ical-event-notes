@@ -9,6 +9,7 @@ interface CalToEventPluginSettings {
 	calendarSources: CalendarSource[];
 	refreshIntervalMinutes: number;
 	eventNoteTemplate: string;
+	targetDirectory: string;
 	cache: {
 		events: CachedEvent[];
 	}
@@ -49,6 +50,7 @@ const DEFAULT_SETTINGS: CalToEventPluginSettings = {
 	calendarSources: [],
 	refreshIntervalMinutes: 15,
 	eventNoteTemplate: EVENT_NOTE_TEMPLATE,
+	targetDirectory: "/",
 	cache: {
 		events: []
 	}
@@ -272,14 +274,22 @@ export class CalendarEventsModal extends SuggestModal<CachedEvent> {
 
 		const fileName = `${datePart}${sanitizedSummary}.md`;
 
+		// Ensure target directory exists
+		const targetDir = this.plugin.settings.targetDirectory;
+		if (targetDir && !this.app.vault.getAbstractFileByPath(targetDir)) {
+			this.app.vault.createFolder(targetDir);
+		}
+
+		const fullPath = targetDir + fileName;
+
 		// Open file if it already exists
-		const existingFile = this.app.vault.getAbstractFileByPath(fileName);
+		const existingFile = this.app.vault.getAbstractFileByPath(fullPath);
 		if (existingFile && existingFile instanceof TFile) {
 			this.app.workspace.getLeaf().openFile(existingFile);
 			return;
 		}
 
-		this.app.vault.create(fileName, formatEvent(this.plugin.settings.eventNoteTemplate, event))
+		this.app.vault.create(fullPath, formatEvent(this.plugin.settings.eventNoteTemplate, event))
 			.then((file) => {
 				this.app.workspace.getLeaf().openFile(file);
 			})
@@ -330,6 +340,21 @@ class IcalToEventsSettingTab extends PluginSettingTab {
 						this.plugin.settings.refreshIntervalMinutes = intValue;
 						await this.plugin.saveSettings();
 					}
+				}));
+
+		new Setting(containerEl)
+			.setName('Target Directory')
+			.setDesc('Directory to create event notes in (relative to vault root)')
+			.addText(text => text
+				.setPlaceholder('/')
+				.setValue(this.plugin.settings.targetDirectory)
+				.onChange(async (value) => {
+					let normalized = value.trim();
+					if (!normalized.startsWith('/')) normalized = '/' + normalized;
+					if (!normalized.endsWith('/')) normalized += '/';
+
+					this.plugin.settings.targetDirectory = normalized;
+					await this.plugin.saveSettings();
 				}));
 
 		new Setting(containerEl)
