@@ -1,9 +1,7 @@
 import * as exp from 'constants';
 import { App, Editor, MarkdownView, Modal, Notice, Platform, Plugin, PluginSettingTab, requestUrl, Setting, SuggestModal, TFile } from 'obsidian';
 import { release } from 'os';
-import { convertIcsCalendar, extendByRecurrenceRule, IcsCalendar, IcsEvent } from 'ts-ics';
-
-// TODO: Auto-link people notes - i.e. look up if name exists, or note with alias of name/email
+import { convertIcsCalendar, extendByRecurrenceRule, IcsAttendee, IcsCalendar, IcsEvent } from 'ts-ics';
 
 interface CalToEventPluginSettings {
 	calendarSources: CalendarSource[];
@@ -112,6 +110,30 @@ function eventRelevance(event: CachedEvent, now: Date): number {
 	return -1
 }
 
+function findByNameOrAlias(app: App, target: string): TFile | null {
+	const { metadataCache, vault } = app;
+
+	for (const file of vault.getMarkdownFiles()) {
+		// Direct filename match (without extension)
+		const basename = file.basename;
+		if (basename.toLowerCase() === target.toLowerCase()) {
+			return file;
+		}
+
+		// Look up aliases in frontmatter
+		const cache = metadataCache.getFileCache(file);
+		const aliases = cache?.frontmatter?.aliases || cache?.frontmatter?.alias;
+
+		if (aliases) {
+			const aliasList = Array.isArray(aliases) ? aliases : [aliases];
+			if (aliasList.some(a => a.toLowerCase() === target.toLowerCase())) {
+				return file;
+			}
+		}
+	}
+	return null;
+}
+
 export default class IcalToEventsPlugin extends Plugin {
 	settings: CalToEventPluginSettings;
 
@@ -217,12 +239,31 @@ class SampleModal extends Modal {
 	}
 }
 
-function formatEvent(template: string, event: IcsEvent): string {
+/**
+* Tries to create a markdown link to a note matching the attendee's name or email.
+* If no matching note is found, returns the attendee's name or email as plain text.
+*/
+function tryMakeAttendeeLink(app: App, attendee: IcsAttendee): string {
+	const attempts = [attendee.name, `@${attendee.name ?? ""}`, attendee.email].map(a => a?.trim()).filter(s => s && s.length > 0 && s !== '@');
+
+	for (const attempt of attempts) {
+		if (!attempt) continue;
+		const file = findByNameOrAlias(app, attempt);
+		if (!file) continue;
+
+		return `[[${file.path}|${attempt}]]`;
+	}
+
+	return attendee.name ?? attendee.email ?? '';
+}
+
+function formatEvent(template: string, event: IcsEvent, app: App): string {
 	const replacements: { [key: string]: string } = {
 		'{{summary}}': event.summary ?? '',
 		'{{location}}': event.location ?? '',
 		'{{description}}': event.description ?? '',
 		'{{attendees}}': (event.attendees ?? []).map(a => a.name ?? a.email ?? '').join(', '),
+		'{{attendees_links}}': (event.attendees ?? []).map(a => tryMakeAttendeeLink(app, a)).join(', '),
 	};
 
 	if (event.start?.date instanceof Date) {
@@ -289,7 +330,7 @@ export class CalendarEventsModal extends SuggestModal<CachedEvent> {
 			return;
 		}
 
-		this.app.vault.create(fullPath, formatEvent(this.plugin.settings.eventNoteTemplate, event))
+		this.app.vault.create(fullPath, formatEvent(this.plugin.settings.eventNoteTemplate, event, this.app))
 			.then((file) => {
 				this.app.workspace.getLeaf().openFile(file);
 			})
