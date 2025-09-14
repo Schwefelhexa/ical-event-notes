@@ -328,10 +328,15 @@ export class CalendarEventsModal extends SuggestModal<CachedEvent> {
 			return;
 		}
 
-		// Ensure target directory exists
+		// Create target directory if it doesn't exist
 		const targetDir = this.plugin.settings.targetDirectory;
-		if (targetDir && !this.app.vault.getAbstractFileByPath(targetDir)) {
-			this.app.vault.createFolder(targetDir);
+		if (targetDir && targetDir !== '/') {
+			const dirExists = this.app.vault.getAbstractFileByPath(targetDir.slice(1, -1));
+			if (!dirExists) {
+				this.app.vault.createFolder(targetDir.slice(1, -1)).catch(err => {
+					new Notice(`Failed to create directory ${targetDir}: ${err.message}`);
+				});
+			}
 		}
 
 		const fullPath = targetDir + fileName;
