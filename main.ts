@@ -355,10 +355,18 @@ class IcalToEventsSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
+		// Main heading
+		containerEl.createEl('h1', { text: 'iCal Event Notes Settings' });
+
+		// Calendar Sources Section
 		containerEl.createEl('h2', { text: 'Calendar Sources' });
+		containerEl.createEl('p', {
+			text: 'Add your calendar URLs (iCal/ICS format) to sync events from.',
+			cls: 'setting-item-description'
+		});
 
 		const sourcesContainer = containerEl.createDiv('calendar-sources-container');
-		sourcesContainer.style.marginBottom = '20px';
+		sourcesContainer.style.marginBottom = '30px';
 
 		this.plugin.settings.calendarSources.forEach((source, index) => {
 			const sourceRow = sourcesContainer.createDiv('calendar-source-row');
@@ -370,15 +378,16 @@ class IcalToEventsSettingTab extends PluginSettingTab {
 			// Name input (smaller)
 			const nameInput = sourceRow.createEl('input', {
 				type: 'text',
-				placeholder: 'Name',
+				placeholder: 'Calendar name',
 				value: source.name
 			});
-			nameInput.style.flex = '0 0 150px';
-			nameInput.style.padding = '4px 8px';
+			nameInput.style.flex = '0 0 180px';
+			nameInput.style.padding = '6px 10px';
 			nameInput.style.border = '1px solid var(--background-modifier-border)';
 			nameInput.style.borderRadius = '4px';
 			nameInput.style.backgroundColor = 'var(--background-primary)';
 			nameInput.style.color = 'var(--text-normal)';
+			nameInput.style.fontSize = '14px';
 			nameInput.addEventListener('input', async (e) => {
 				this.plugin.settings.calendarSources[index].name = (e.target as HTMLInputElement).value;
 				await this.plugin.saveSettings();
@@ -389,16 +398,17 @@ class IcalToEventsSettingTab extends PluginSettingTab {
 
 			// URL input (wider)
 			const urlInput = sourceRow.createEl('input', {
-				type: 'text',
-				placeholder: 'https://example.com/calendar.ics',
+				type: 'url',
+				placeholder: 'https://calendar.google.com/calendar/ical/...',
 				value: source.url
 			});
 			urlInput.style.flex = '1';
-			urlInput.style.padding = '4px 8px';
+			urlInput.style.padding = '6px 10px';
 			urlInput.style.border = '1px solid var(--background-modifier-border)';
 			urlInput.style.borderRadius = '4px';
 			urlInput.style.backgroundColor = 'var(--background-primary)';
 			urlInput.style.color = 'var(--text-normal)';
+			urlInput.style.fontSize = '14px';
 			urlInput.addEventListener('input', async (e) => {
 				this.plugin.settings.calendarSources[index].url = (e.target as HTMLInputElement).value;
 				await this.plugin.saveSettings();
@@ -410,10 +420,10 @@ class IcalToEventsSettingTab extends PluginSettingTab {
 			// Remove button (X)
 			const removeBtn = sourceRow.createEl('button', {
 				text: '×',
-				attr: { 'aria-label': 'Remove source' }
+				attr: { 'aria-label': 'Remove calendar source' }
 			});
-			removeBtn.style.width = '24px';
-			removeBtn.style.height = '24px';
+			removeBtn.style.width = '28px';
+			removeBtn.style.height = '28px';
 			removeBtn.style.padding = '0';
 			removeBtn.style.border = 'none';
 			removeBtn.style.borderRadius = '4px';
@@ -425,6 +435,7 @@ class IcalToEventsSettingTab extends PluginSettingTab {
 			removeBtn.style.display = 'flex';
 			removeBtn.style.alignItems = 'center';
 			removeBtn.style.justifyContent = 'center';
+			removeBtn.style.transition = 'all 0.1s ease-in-out';
 			removeBtn.addEventListener('mouseenter', () => {
 				removeBtn.style.backgroundColor = 'var(--background-modifier-error)';
 				removeBtn.style.color = 'var(--text-on-accent)';
@@ -440,11 +451,10 @@ class IcalToEventsSettingTab extends PluginSettingTab {
 			});
 		});
 
-		const addSourceButton = new Setting(containerEl)
-			.setName('Add Calendar Source')
-			.setDesc('Add a new calendar source')
+		new Setting(containerEl)
+			.setName('')
 			.addButton(button => button
-				.setButtonText('Add Source')
+				.setButtonText('+ Add Calendar')
 				.setCta()
 				.onClick(async () => {
 					this.plugin.settings.calendarSources.push({ name: '', url: '' });
@@ -452,46 +462,168 @@ class IcalToEventsSettingTab extends PluginSettingTab {
 					this.display();
 				}));
 
-		containerEl.createEl('h2', { text: 'Settings' });
+		// Note Creation Section
+		containerEl.createEl('h2', { text: 'Note Creation' });
+
+		// Target Directory with autocomplete
+		const directorySetting = new Setting(containerEl)
+			.setName('Notes Location')
+			.setDesc('Where to create event notes in your vault');
+
+		// Get all folders in vault for suggestions
+		const folders: string[] = ['/'];
+		const folderSet = new Set<string>();
+
+		// Get all files and folders
+		const allFiles = this.app.vault.getAllLoadedFiles();
+
+		allFiles.forEach(abstractFile => {
+			// Check if it's a folder (TFolder type check)
+			if ('children' in abstractFile) {
+				// It's a folder
+				const folderPath = '/' + abstractFile.path + '/';
+				if (abstractFile.path && !folderSet.has(folderPath)) {
+					folderSet.add(folderPath);
+					folders.push(folderPath);
+				}
+			} else {
+				// It's a file - extract parent folders
+				const path = abstractFile.path;
+				const lastSlash = path.lastIndexOf('/');
+				if (lastSlash > 0) {
+					const parentPath = '/' + path.substring(0, lastSlash) + '/';
+					if (!folderSet.has(parentPath)) {
+						folderSet.add(parentPath);
+						folders.push(parentPath);
+					}
+				}
+			}
+		});
+
+		// Sort folders alphabetically
+		folders.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
+		directorySetting.addSearch(search => {
+			search
+				.setPlaceholder('e.g., /Events or /Calendar/2024')
+				.setValue(this.plugin.settings.targetDirectory)
+				.onChange(async (value) => {
+					let normalized = value.trim();
+					if (normalized && !normalized.startsWith('/')) normalized = '/' + normalized;
+					if (normalized && !normalized.endsWith('/')) normalized += '/';
+
+					this.plugin.settings.targetDirectory = normalized || '/';
+					await this.plugin.saveSettings();
+				});
+
+			// Add autocomplete suggestions
+			const searchInput = search.inputEl;
+			searchInput.addEventListener('focus', () => {
+				const currentValue = searchInput.value.toLowerCase();
+				const suggestions = folders.filter(f =>
+					f.toLowerCase().includes(currentValue)
+				).slice(0, 5);
+
+				// Simple autocomplete (you could enhance this with a dropdown)
+				searchInput.setAttribute('list', 'folder-suggestions');
+				let datalist = containerEl.querySelector('#folder-suggestions') as HTMLDataListElement;
+				if (!datalist) {
+					datalist = containerEl.createEl('datalist', { attr: { id: 'folder-suggestions' } });
+				}
+				datalist.empty();
+				suggestions.forEach(folder => {
+					datalist.createEl('option', { value: folder });
+				});
+			});
+		});
+
+		// Note Template - Full Width
+		containerEl.createEl('h3', { text: 'Note Template' });
+		containerEl.createEl('p', {
+			text: 'Customize how event notes are created. Available placeholders:',
+			cls: 'setting-item-description'
+		});
+
+		// Placeholder documentation
+		const placeholderInfo = containerEl.createDiv('template-placeholders');
+		placeholderInfo.style.marginBottom = '10px';
+		placeholderInfo.style.padding = '10px';
+		placeholderInfo.style.backgroundColor = 'var(--background-secondary)';
+		placeholderInfo.style.borderRadius = '4px';
+		placeholderInfo.style.fontSize = '12px';
+		placeholderInfo.style.fontFamily = 'var(--font-monospace)';
+		placeholderInfo.innerHTML = `
+			<code>{{summary}}</code> - Event title<br>
+			<code>{{date}}</code> - Event date<br>
+			<code>{{start}}</code> / <code>{{end}}</code> - Start/end times<br>
+			<code>{{location}}</code> - Event location<br>
+			<code>{{description}}</code> - Event description<br>
+			<code>{{attendees}}</code> - List of attendees<br>
+			<code>{{attendees_links}}</code> - Attendees as wiki links (if matching notes exist)
+		`;
+
+		const templateContainer = containerEl.createDiv('template-container');
+		templateContainer.style.marginBottom = '20px';
+
+		const templateTextarea = templateContainer.createEl('textarea');
+		templateTextarea.placeholder = EVENT_NOTE_TEMPLATE;
+		templateTextarea.value = this.plugin.settings.eventNoteTemplate || EVENT_NOTE_TEMPLATE;
+		templateTextarea.style.width = '100%';
+		templateTextarea.style.minHeight = '300px';
+		templateTextarea.style.padding = '10px';
+		templateTextarea.style.border = '1px solid var(--background-modifier-border)';
+		templateTextarea.style.borderRadius = '4px';
+		templateTextarea.style.backgroundColor = 'var(--background-primary)';
+		templateTextarea.style.color = 'var(--text-normal)';
+		templateTextarea.style.fontSize = '13px';
+		templateTextarea.style.fontFamily = 'var(--font-monospace)';
+		templateTextarea.style.resize = 'vertical';
+		templateTextarea.addEventListener('input', async (e) => {
+			this.plugin.settings.eventNoteTemplate = (e.target as HTMLTextAreaElement).value;
+			await this.plugin.saveSettings();
+		});
+
+		// Sync Settings Section
+		containerEl.createEl('h2', { text: 'Sync Settings' });
 
 		new Setting(containerEl)
-			.setName('Refresh Interval (minutes)')
-			.setDesc('How often to refresh the calendar data')
+			.setName('Refresh Interval')
+			.setDesc('How often to check for new events (in minutes)')
+			.addSlider(slider => slider
+				.setLimits(5, 60, 5)
+				.setValue(this.plugin.settings.refreshIntervalMinutes)
+				.setDynamicTooltip()
+				.onChange(async (value) => {
+					this.plugin.settings.refreshIntervalMinutes = value;
+					await this.plugin.saveSettings();
+				}))
 			.addText(text => text
-				.setPlaceholder('15')
 				.setValue(this.plugin.settings.refreshIntervalMinutes.toString())
 				.onChange(async (value) => {
 					const intValue = parseInt(value);
-					if (!isNaN(intValue) && intValue > 0) {
+					if (!isNaN(intValue) && intValue >= 5 && intValue <= 60) {
 						this.plugin.settings.refreshIntervalMinutes = intValue;
 						await this.plugin.saveSettings();
 					}
 				}));
 
-		new Setting(containerEl)
-			.setName('Target Directory')
-			.setDesc('Directory to create event notes in (relative to vault root)')
-			.addText(text => text
-				.setPlaceholder('/')
-				.setValue(this.plugin.settings.targetDirectory)
-				.onChange(async (value) => {
-					let normalized = value.trim();
-					if (!normalized.startsWith('/')) normalized = '/' + normalized;
-					if (!normalized.endsWith('/')) normalized += '/';
-
-					this.plugin.settings.targetDirectory = normalized;
-					await this.plugin.saveSettings();
-				}));
+		// Actions Section
+		containerEl.createEl('h2', { text: 'Actions' });
 
 		new Setting(containerEl)
-			.setName('Event Note Template')
-			.setDesc('Template for event notes. Use {{placeholders}} for event properties.')
-			.addTextArea(text => text
-				.setPlaceholder(EVENT_NOTE_TEMPLATE)
-				.setValue(this.plugin.settings.eventNoteTemplate)
-				.onChange(async (value) => {
-					this.plugin.settings.eventNoteTemplate = value;
-					await this.plugin.saveSettings();
+			.setName('Manual Refresh')
+			.setDesc('Immediately refresh calendar data from all sources')
+			.addButton(button => button
+				.setButtonText('Refresh Now')
+				.onClick(async () => {
+					button.setDisabled(true);
+					button.setButtonText('Refreshing...');
+					await this.refreshCache();
+					button.setButtonText('Done!');
+					setTimeout(() => {
+						button.setButtonText('Refresh Now');
+						button.setDisabled(false);
+					}, 2000);
 				}));
 	}
 }
