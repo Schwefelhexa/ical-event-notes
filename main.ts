@@ -307,11 +307,14 @@ export class CalendarEventsModal extends SuggestModal<CachedEvent> {
 
 	// Perform action on the selected suggestion.
 	onChooseSuggestion(event: CachedEvent, evt: MouseEvent | KeyboardEvent) {
-		const sanitizedSummary = event.summary?.replace(/[\/\\?%*:|"<>]/g, '-') ?? 'Event';
+		let sanitizedSummary = event.summary?.replace(/[\/\\?%*:|"<>]/g, '-') ?? 'Event';
+		for (const char of ['[', ']', '^', '$']) {
+			sanitizedSummary = sanitizedSummary.replace(char, '');
+		}
 
 		const datePart = event.start?.date instanceof Date
-			? event.start.date.toISOString().split('T')[0] + " | "
-			: '';
+			? event.start.date.toISOString().split('T')[0] + " — "
+			: event.start?.date ?? '';
 
 		const fileName = `${datePart}${sanitizedSummary}.md`;
 
