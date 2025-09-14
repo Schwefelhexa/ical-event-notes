@@ -113,10 +113,12 @@ function eventRelevance(event: CachedEvent, now: Date): number {
 function findByNameOrAlias(app: App, target: string): TFile | null {
 	const { metadataCache, vault } = app;
 
+	const sanitizedTarget = target.replace(/\.md$/, '').trim();
+
 	for (const file of vault.getMarkdownFiles()) {
 		// Direct filename match (without extension)
 		const basename = file.basename;
-		if (basename.toLowerCase() === target.toLowerCase()) {
+		if (basename.toLowerCase() === sanitizedTarget.toLowerCase()) {
 			return file;
 		}
 
@@ -126,7 +128,7 @@ function findByNameOrAlias(app: App, target: string): TFile | null {
 
 		if (aliases) {
 			const aliasList = Array.isArray(aliases) ? aliases : [aliases];
-			if (aliasList.some(a => a.toLowerCase() === target.toLowerCase())) {
+			if (aliasList.some(a => a.toLowerCase() === sanitizedTarget.toLowerCase())) {
 				return file;
 			}
 		}
@@ -318,6 +320,13 @@ export class CalendarEventsModal extends SuggestModal<CachedEvent> {
 
 		const fileName = `${datePart}${sanitizedSummary}.md`;
 
+		// Open existing file if it exists
+		const existingFile = findByNameOrAlias(this.app, fileName);
+		if (existingFile) {
+			this.app.workspace.getLeaf().openFile(existingFile);
+			return;
+		}
+
 		// Ensure target directory exists
 		const targetDir = this.plugin.settings.targetDirectory;
 		if (targetDir && !this.app.vault.getAbstractFileByPath(targetDir)) {
@@ -325,14 +334,6 @@ export class CalendarEventsModal extends SuggestModal<CachedEvent> {
 		}
 
 		const fullPath = targetDir + fileName;
-
-		// Open file if it already exists
-		const existingFile = this.app.vault.getAbstractFileByPath(fullPath);
-		if (existingFile && existingFile instanceof TFile) {
-			this.app.workspace.getLeaf().openFile(existingFile);
-			return;
-		}
-
 		this.app.vault.create(fullPath, formatEvent(this.plugin.settings.eventNoteTemplate, event, this.app))
 			.then((file) => {
 				this.app.workspace.getLeaf().openFile(file);
