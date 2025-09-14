@@ -79,11 +79,12 @@ function expandRelevantEvents(events: CachedEvent[], now: Date): CachedEvent[] {
 
 			return {
 				...event,
-				id: `${event.recurrenceId ?? event.uid}-${date.toISOString()}`, // Unique ID per occurrence
+				uid: `${event.recurrenceId ?? event.uid}-${date.toISOString()}`, // Unique ID per occurrence
 				start: { ...event.start, date: date },
 				end: { ...event.end, date: new Date(date.getTime() + (event.end!.date.getTime() - event.start!.date.getTime())) }, // Maintain duration
-				recurrenceRule: undefined // Clear recurrence rule for occurrences
-			};
+				recurrenceRule: undefined, // Clear recurrence rule for occurrences
+				duration: undefined // Clear duration for occurrences
+			} as CachedEvent;
 		});
 
 		return occurrences;
@@ -354,25 +355,101 @@ class IcalToEventsSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		new Setting(containerEl)
-			.setName('Calendar Sources')
-			.setDesc('List of calendar sources to fetch events from')
-			.addTextArea(text => text
-				.setPlaceholder('Work Calendar,https://example.com/work.ics\nPersonal Calendar,https://example.com/personal.ics')
-				.setValue(this.plugin.settings.calendarSources.map(src => `${src.name},${src.url}`).join('\n'))
-				.onChange(async (value) => {
-					const lines = value.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-					const sources: CalendarSource[] = [];
-					for (const line of lines) {
-						const [name, url] = line.split(',').map(part => part.trim());
-						if (name && url) {
-							sources.push({ name, url });
-						}
-					}
-					this.plugin.settings.calendarSources = sources;
+		containerEl.createEl('h2', { text: 'Calendar Sources' });
+
+		const sourcesContainer = containerEl.createDiv('calendar-sources-container');
+		sourcesContainer.style.marginBottom = '20px';
+
+		this.plugin.settings.calendarSources.forEach((source, index) => {
+			const sourceRow = sourcesContainer.createDiv('calendar-source-row');
+			sourceRow.style.display = 'flex';
+			sourceRow.style.alignItems = 'center';
+			sourceRow.style.marginBottom = '8px';
+			sourceRow.style.gap = '8px';
+
+			// Name input (smaller)
+			const nameInput = sourceRow.createEl('input', {
+				type: 'text',
+				placeholder: 'Name',
+				value: source.name
+			});
+			nameInput.style.flex = '0 0 150px';
+			nameInput.style.padding = '4px 8px';
+			nameInput.style.border = '1px solid var(--background-modifier-border)';
+			nameInput.style.borderRadius = '4px';
+			nameInput.style.backgroundColor = 'var(--background-primary)';
+			nameInput.style.color = 'var(--text-normal)';
+			nameInput.addEventListener('input', async (e) => {
+				this.plugin.settings.calendarSources[index].name = (e.target as HTMLInputElement).value;
+				await this.plugin.saveSettings();
+				await this.refreshCache();
+			});
+
+			// URL input (wider)
+			const urlInput = sourceRow.createEl('input', {
+				type: 'text',
+				placeholder: 'https://example.com/calendar.ics',
+				value: source.url
+			});
+			urlInput.style.flex = '1';
+			urlInput.style.padding = '4px 8px';
+			urlInput.style.border = '1px solid var(--background-modifier-border)';
+			urlInput.style.borderRadius = '4px';
+			urlInput.style.backgroundColor = 'var(--background-primary)';
+			urlInput.style.color = 'var(--text-normal)';
+			urlInput.addEventListener('input', async (e) => {
+				this.plugin.settings.calendarSources[index].url = (e.target as HTMLInputElement).value;
+				await this.plugin.saveSettings();
+				await this.refreshCache();
+			});
+
+			// Remove button (X)
+			const removeBtn = sourceRow.createEl('button', {
+				text: '×',
+				attr: { 'aria-label': 'Remove source' }
+			});
+			removeBtn.style.width = '24px';
+			removeBtn.style.height = '24px';
+			removeBtn.style.padding = '0';
+			removeBtn.style.border = 'none';
+			removeBtn.style.borderRadius = '4px';
+			removeBtn.style.backgroundColor = 'transparent';
+			removeBtn.style.color = 'var(--text-muted)';
+			removeBtn.style.fontSize = '20px';
+			removeBtn.style.lineHeight = '1';
+			removeBtn.style.cursor = 'pointer';
+			removeBtn.style.display = 'flex';
+			removeBtn.style.alignItems = 'center';
+			removeBtn.style.justifyContent = 'center';
+			removeBtn.addEventListener('mouseenter', () => {
+				removeBtn.style.backgroundColor = 'var(--background-modifier-error)';
+				removeBtn.style.color = 'var(--text-on-accent)';
+			});
+			removeBtn.addEventListener('mouseleave', () => {
+				removeBtn.style.backgroundColor = 'transparent';
+				removeBtn.style.color = 'var(--text-muted)';
+			});
+			removeBtn.addEventListener('click', async () => {
+				this.plugin.settings.calendarSources.splice(index, 1);
+				await this.plugin.saveSettings();
+				await this.refreshCache();
+				this.display();
+			});
+		});
+
+		const addSourceButton = new Setting(containerEl)
+			.setName('Add Calendar Source')
+			.setDesc('Add a new calendar source')
+			.addButton(button => button
+				.setButtonText('Add Source')
+				.setCta()
+				.onClick(async () => {
+					this.plugin.settings.calendarSources.push({ name: '', url: '' });
 					await this.plugin.saveSettings();
-					await this.refreshCache();
+					this.display();
 				}));
+
+		containerEl.createEl('h2', { text: 'Settings' });
 
 		new Setting(containerEl)
 			.setName('Refresh Interval (minutes)')
