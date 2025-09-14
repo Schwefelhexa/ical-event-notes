@@ -382,6 +382,8 @@ class IcalToEventsSettingTab extends PluginSettingTab {
 			nameInput.addEventListener('input', async (e) => {
 				this.plugin.settings.calendarSources[index].name = (e.target as HTMLInputElement).value;
 				await this.plugin.saveSettings();
+			});
+			nameInput.addEventListener('blur', async () => {
 				await this.refreshCache();
 			});
 
@@ -400,6 +402,8 @@ class IcalToEventsSettingTab extends PluginSettingTab {
 			urlInput.addEventListener('input', async (e) => {
 				this.plugin.settings.calendarSources[index].url = (e.target as HTMLInputElement).value;
 				await this.plugin.saveSettings();
+			});
+			urlInput.addEventListener('blur', async () => {
 				await this.refreshCache();
 			});
 
@@ -432,7 +436,6 @@ class IcalToEventsSettingTab extends PluginSettingTab {
 			removeBtn.addEventListener('click', async () => {
 				this.plugin.settings.calendarSources.splice(index, 1);
 				await this.plugin.saveSettings();
-				await this.refreshCache();
 				this.display();
 			});
 		});
