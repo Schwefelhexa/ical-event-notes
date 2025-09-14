@@ -165,7 +165,7 @@ export default class IcalToEventsPlugin extends Plugin {
 		})
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new IcalToEventsSettingTab(this.app, this));
+		this.addSettingTab(new IcalToEventsSettingTab(this.app, this, this.refresh.bind(this)));
 
 		// Register interval-based and focus-based refresh
 		if (!Platform.isMobileApp) {
@@ -344,7 +344,7 @@ export class CalendarEventsModal extends SuggestModal<CachedEvent> {
 class IcalToEventsSettingTab extends PluginSettingTab {
 	plugin: IcalToEventsPlugin;
 
-	constructor(app: App, plugin: IcalToEventsPlugin) {
+	constructor(app: App, plugin: IcalToEventsPlugin, private refreshCache: () => Promise<void>) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
@@ -371,6 +371,7 @@ class IcalToEventsSettingTab extends PluginSettingTab {
 					}
 					this.plugin.settings.calendarSources = sources;
 					await this.plugin.saveSettings();
+					await this.refreshCache();
 				}));
 
 		new Setting(containerEl)
