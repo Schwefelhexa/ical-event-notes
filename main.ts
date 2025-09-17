@@ -254,7 +254,7 @@ function tryMakeAttendeeLink(app: App, attendee: IcsAttendee): string {
 		const file = findByNameOrAlias(app, attempt);
 		if (!file) continue;
 
-		return `[[${file.path}|${attempt}]]`;
+		return `[[${file.path}|${file.basename}]]`;
 	}
 
 	return attendee.name ?? attendee.email ?? '';
