@@ -222,7 +222,7 @@ export default class IcalToEventsPlugin extends Plugin {
 
 		// Re-normalize cached event dates after deserialization
 		// (JSON.parse converts Date objects to strings, so we need to reconstruct them)
-		loaded.cache.events = loaded.cache.events.map(event => ({
+		loaded.cache.events = loaded.cache.events.map((event: CachedEvent) => ({
 			...event,
 			start: { ...event.start, date: normalizeDate(event.start?.date) },
 			end: { ...event.end, date: normalizeDate(event.end?.date) }
