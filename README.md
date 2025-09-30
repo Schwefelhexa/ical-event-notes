@@ -64,7 +64,7 @@ Example: If you have a note at `People/@John Doe.md` with the alias `john.doe@ex
 
 ### Manual Installation
 
-1. Download the latest release from the [releases page](https://github.com/yourusername/ical-event-notes/releases)
+1. Download the latest release from the [releases page](https://github.com/Schwefelhexa/ical-event-notes/releases)
 2. Extract the files into your vault's `.obsidian/plugins/ical-event-notes/` directory
 3. Reload Obsidian
 4. Enable the plugin in Settings → Community Plugins
@@ -184,9 +184,15 @@ All available placeholders for customizing your note template:
 - No data is sent to third-party services
 - Calendar URLs may contain secret tokens—treat them like passwords
 
+## Support & Development
+
+- **Issues**: [GitHub Issues](https://github.com/Schwefelhexa/ical-event-notes/issues)
+- **Feature Requests**: [GitHub Discussions](https://github.com/Schwefelhexa/ical-event-notes/discussions)
+- **Source Code**: [GitHub Repository](https://github.com/Schwefelhexa/ical-event-notes)
+
 ## License
 
-MIT License - See LICENSE file for details
+0BSD License - See LICENSE file for details
 
 ## Credits
 
