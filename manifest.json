@@ -3,7 +3,7 @@
 	"name": "iCal Event Notes",
 	"version": "0.1.0",
 	"minAppVersion": "0.15.0",
-	"description": "Create Obsidian Notes from any iCal Event",
+	"description": "Sync calendar events from iCal sources and create meeting notes with intelligent participant linking and customizable templates",
 	"author": "Alexander Baron",
 	"authorUrl": "https://alexbaron.me",
 	"isDesktopOnly": false
