@@ -19,7 +19,7 @@ An Obsidian plugin that syncs your calendar events and creates structured meetin
 - **Smart Event Selection**: Events are sorted by relevance — ongoing events appear first, followed by upcoming and recently ended ones
 - **Duplicate Prevention**: Automatically opens existing event notes instead of creating duplicates
 
-![Screenshot: Event selection modal showing upcoming meetings](docs/event_suggestion.png)
+![Screenshot: Event selection modal showing upcoming meetings](docs/event_suggestions.png)
 
 ### Intelligent Participant Linking
 
