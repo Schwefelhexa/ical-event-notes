@@ -62,7 +62,7 @@ Example: If you have a note at `People/@John Doe.md` with the alias `john.doe@ex
 
 ### Manual Installation
 
-1. Download the latest release from the [releases page](https://github.com/yourusername/ical-event-notes/releases)
+1. Download the latest release from the [releases page](https://github.com/Schwefelhexa/ical-event-notes/releases)
 2. Extract the files into your vault's `.obsidian/plugins/ical-event-notes/` directory
 3. Reload Obsidian
 4. Enable the plugin in Settings → Community Plugins
