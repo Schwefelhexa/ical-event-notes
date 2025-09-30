@@ -1,94 +1,197 @@
-# Obsidian Sample Plugin
+# iCal Event Notes
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+An Obsidian plugin that syncs your calendar events and creates structured meeting notes with a single command.
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+![Screenshot: Plugin settings showing calendar sources](placeholder-settings.png)
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+## Features
 
-## First time developing plugins?
+### Calendar Integration
 
-Quick starting guide for new plugin devs:
+- **Multiple Calendar Support**: Connect unlimited iCal/ICS calendar sources (Google Calendar, Outlook, CalDAV, etc.)
+- **Automatic Sync**: Fetches events at configurable intervals (5-60 minutes) and on window focus
+- **Recurring Events**: Full support for recurring events with proper expansion of event series
+- **Smart Event Filtering**: Shows only relevant events (currently active, upcoming in next 24h, or recently ended within 1h)
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+### Quick Note Creation
 
-## Releasing new releases
+- **One-Command Access**: Use the command palette to instantly see and create notes from relevant events
+- **Smart Event Selection**: Events are sorted by relevance — ongoing events appear first, followed by upcoming and recently ended ones
+- **Duplicate Prevention**: Automatically opens existing event notes instead of creating duplicates
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+![Screenshot: Event selection modal showing upcoming meetings](placeholder-event-modal.png)
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+### Intelligent Participant Linking
 
-## Adding your plugin to the community plugin list
+One of the most powerful features: automatically links meeting participants to existing notes in your vault.
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+- **Email-to-Note Matching**: Recognizes when `john.doe@example.com` corresponds to your `@John Doe` note
+- **Alias Support**: Checks both filenames and frontmatter aliases for matches
+- **Flexible Matching**: Tries multiple variations (full name, @-prefixed name, email) to find the best match
+- **Graceful Fallback**: Shows plain text for unrecognized participants
 
-## How to use
+Example: If you have a note at `People/@John Doe.md` with the alias `john.doe@example.com` in its frontmatter, the plugin will automatically link to `[[@John Doe]]` if `john.doe@example.com` was invited to the event.
 
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
+### Customizable Templates
 
-## Manually installing the plugin
+- **Full Template Control**: Customize the structure and content of generated event notes
+- **Rich Placeholders**: Access event data including:
+  - `{{summary}}` - Event title
+  - `{{date}}` - Event date
+  - `{{start}}` / `{{end}}` - Start and end times
+  - `{{location}}` - Event location
+  - `{{description}}` - Full event description
+  - `{{attendees}}` - Plain text list of participants
+  - `{{attendees_links}}` - Auto-linked participants (uses intelligent matching)
+- **Filename Generation**: Creates clean, filesystem-safe filenames with date prefixes (e.g., `2024-03-15 — Team Standup.md`)
 
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
+![Screenshot: Template editor showing available placeholders](placeholder-template-editor.png)
 
-## Improve code quality with eslint (optional)
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- To use eslint with this project, make sure to install eslint from terminal:
-  - `npm install -g eslint`
-- To use eslint to analyze this project use this command:
-  - `eslint main.ts`
-  - eslint will then create a report with suggestions for code improvement by file and line number.
-- If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder:
-  - `eslint .\src\`
+### Organized Note Storage
 
-## Funding URL
+- **Configurable Location**: Choose where event notes are saved in your vault
+- **Folder Autocomplete**: Built-in folder picker with suggestions from your vault structure
+- **Auto-Create Directories**: Target folders are created automatically if they don't exist
 
-You can include funding URLs where people who use your plugin can financially support it.
+## Installation
 
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
+### From Obsidian Community Plugins (Recommended)
 
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
-```
+1. Open Obsidian Settings
+2. Navigate to Community Plugins and disable Safe Mode
+3. Click Browse and search for "iCal Event Notes"
+4. Click Install, then Enable
 
-If you have multiple URLs, you can also do:
+### Manual Installation
 
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
-```
+1. Download the latest release from the [releases page](https://github.com/yourusername/ical-event-notes/releases)
+2. Extract the files into your vault's `.obsidian/plugins/ical-event-notes/` directory
+3. Reload Obsidian
+4. Enable the plugin in Settings → Community Plugins
 
-## API Documentation
+## Setup
 
-See https://github.com/obsidianmd/obsidian-api
+### 1. Add Calendar Sources
+
+1. Open Settings → iCal Event Notes
+2. Click "+ Add Calendar"
+3. Enter a name for your calendar
+4. Paste your calendar's iCal/ICS URL
+
+**Where to find calendar URLs:**
+
+- **Google Calendar**: Calendar Settings → Integrate Calendar → Secret address in iCal format
+- **Outlook/Office 365**: Calendar Settings → Shared Calendars → Publish → ICS link
+- **Apple Calendar**: File → Export → Save as .ics, then host the file or use a CalDAV URL
+
+### 2. Configure Note Location (Optional)
+
+Choose where event notes should be created. Default is your vault root (`/`).
+
+Examples: `/Events/`, `/Calendar/2024/`, `/Meetings/`
+
+### 3. Customize Template (Optional)
+
+Modify the template to match your note-taking style. The default template includes frontmatter for event metadata and a basic structure.
+
+### 4. Set Up Participant Linking (Optional)
+
+To enable automatic linking of meeting participants:
+
+1. Create notes for your contacts (e.g., `@John Doe.md`)
+2. Add email addresses as aliases in the frontmatter:
+   ```md
+   ---
+   aliases:
+     - john.doe@example.com
+     - jdoe@company.com
+   ---
+   ```
+3. Use `{{attendees_links}}` in your template
+
+## Usage
+
+### Creating Event Notes
+
+1. Open the command palette (`Cmd/Ctrl + P`)
+2. Run "iCal Event Notes: Create/Open Note from Event"
+3. Select an event from the list
+4. A new note is created and opened (or existing note is opened if it already exists)
+
+![Screenshot: Completed event note showing linked participants and metadata](placeholder-event-note.png)
+
+### Refreshing Calendar Data
+
+**Automatic**: The plugin refreshes automatically:
+- Every X minutes (configurable, default 15)
+- When you focus the Obsidian window
+
+**Manual**:
+- Command palette: "iCal Event Notes: Reload Calendar"
+- Settings panel: Click "Refresh Now" button
+
+## Settings Reference
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Calendar Sources | List of iCal/ICS URLs to sync | None |
+| Notes Location | Vault folder for event notes | `/` (root) |
+| Note Template | Markdown template for new notes | Included default |
+| Refresh Interval | Minutes between automatic syncs | 15 |
+
+## Template Variables
+
+All available placeholders for customizing your note template:
+
+| Variable | Description | Example Output |
+|----------|-------------|----------------|
+| `{{summary}}` | Event title | "Team Standup" |
+| `{{date}}` | Event date | "3/15/2024" |
+| `{{start}}` | Start date and time | "3/15/2024, 10:00:00 AM" |
+| `{{end}}` | End date and time | "3/15/2024, 10:30:00 AM" |
+| `{{location}}` | Event location | "Conference Room A" |
+| `{{description}}` | Full event description | (Full text from calendar) |
+| `{{attendees}}` | Plain text attendee list | "John Doe, Jane Smith" |
+| `{{attendees_links}}` | Auto-linked attendees | "[[@John Doe]], [[@Jane Smith]]" |
+
+## Tips & Tricks
+
+- **Mobile Support**: The plugin works on mobile, but automatic refresh is disabled to preserve battery life
+- **Recurring Meetings**: Each occurrence of a recurring event gets a unique note with the appropriate date
+- **Private URLs**: Your calendar URLs are stored locally in Obsidian settings—they're never sent anywhere except to your calendar provider
+- **Bulk Setup**: You can add multiple calendar sources to aggregate events from work, personal, and shared calendars
+
+## Troubleshooting
+
+**Events aren't showing up:**
+- Verify your calendar URL is correct and accessible
+- Check that events fall within the relevance window (1 hour ago to 24 hours ahead)
+- Manually refresh using the command or settings button
+- Check the console for any error messages
+
+**Participant linking isn't working:**
+- Ensure the contact note exists in your vault
+- Verify the email is listed in the note's frontmatter aliases (case-insensitive matching)
+- Try both `name@domain.com` and `@Name` formats as aliases
+
+**Mobile sync issues:**
+- Automatic refresh on interval is disabled on mobile—use manual refresh or pull-to-focus
+
+## Privacy & Security
+
+- Calendar URLs and cached event data are stored locally in your Obsidian vault
+- The plugin only communicates with the calendar URLs you provide
+- No data is sent to third-party services
+- Calendar URLs may contain secret tokens—treat them like passwords
+
+## License
+
+MIT License - See LICENSE file for details
+
+## Credits
+
+Built with [ts-ics](https://github.com/Schedule-it/ts-ics) for iCal parsing.
+
+---
+
+**Enjoyed this plugin?** Consider starring the repository or sharing it with fellow Obsidian users!
