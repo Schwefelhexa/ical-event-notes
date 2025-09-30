@@ -2,7 +2,7 @@
 
 An Obsidian plugin that syncs your calendar events and creates structured meeting notes with a single command.
 
-![Screenshot: Plugin settings showing calendar sources](placeholder-settings.png)
+![Screenshot: Plugin settings showing calendar sources](docs/calendar_sources.png)
 
 ## Features
 
@@ -19,7 +19,7 @@ An Obsidian plugin that syncs your calendar events and creates structured meetin
 - **Smart Event Selection**: Events are sorted by relevance — ongoing events appear first, followed by upcoming and recently ended ones
 - **Duplicate Prevention**: Automatically opens existing event notes instead of creating duplicates
 
-![Screenshot: Event selection modal showing upcoming meetings](placeholder-event-modal.png)
+![Screenshot: Event selection modal showing upcoming meetings](docs/event_suggestion.png)
 
 ### Intelligent Participant Linking
 
@@ -45,8 +45,6 @@ Example: If you have a note at `People/@John Doe.md` with the alias `john.doe@ex
   - `{{attendees_links}}` - Auto-linked participants (uses intelligent matching)
 - **Filename Generation**: Creates clean, filesystem-safe filenames with date prefixes (e.g., `2024-03-15 — Team Standup.md`)
 
-![Screenshot: Template editor showing available placeholders](placeholder-template-editor.png)
-
 ### Organized Note Storage
 
 - **Configurable Location**: Choose where event notes are saved in your vault
@@ -64,7 +62,7 @@ Example: If you have a note at `People/@John Doe.md` with the alias `john.doe@ex
 
 ### Manual Installation
 
-1. Download the latest release from the [releases page](https://github.com/Schwefelhexa/ical-event-notes/releases)
+1. Download the latest release from the [releases page](https://github.com/yourusername/ical-event-notes/releases)
 2. Extract the files into your vault's `.obsidian/plugins/ical-event-notes/` directory
 3. Reload Obsidian
 4. Enable the plugin in Settings → Community Plugins
@@ -118,7 +116,7 @@ To enable automatic linking of meeting participants:
 3. Select an event from the list
 4. A new note is created and opened (or existing note is opened if it already exists)
 
-![Screenshot: Completed event note showing linked participants and metadata](placeholder-event-note.png)
+![Screenshot: Completed event note showing linked participants and metadata](docs/example_note.png)
 
 ### Refreshing Calendar Data
 
@@ -183,12 +181,6 @@ All available placeholders for customizing your note template:
 - The plugin only communicates with the calendar URLs you provide
 - No data is sent to third-party services
 - Calendar URLs may contain secret tokens—treat them like passwords
-
-## Support & Development
-
-- **Issues**: [GitHub Issues](https://github.com/Schwefelhexa/ical-event-notes/issues)
-- **Feature Requests**: [GitHub Discussions](https://github.com/Schwefelhexa/ical-event-notes/discussions)
-- **Source Code**: [GitHub Repository](https://github.com/Schwefelhexa/ical-event-notes)
 
 ## License
 
